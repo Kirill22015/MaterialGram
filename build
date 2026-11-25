@@ -1,0 +1,39 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install NDK and CMake
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "ndk;<версия_из_проекта>" "cmake;<версия_из_проекта>"
+
+      - name: Configure
+        run: |
+          echo "APP_ID=${{ secrets.APP_ID }}" >> gradle.properties
+          echo "APP_HASH=${{ secrets.APP_HASH }}" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx4g" >> gradle.properties
+
+      - name: Build
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: "**/build/outputs/apk/**/*.apk"
