@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -32,11 +32,16 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install NDK
-        run: sdkmanager "ndk;29.0.14206865"
+      # Android SDK уже стоит на раннере (ANDROID_HOME), отдельный setup-android не нужен
+      - name: Accept licenses and install NDK
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then
+            SDKM="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -n1)"
+          fi
+          echo "sdkmanager: $SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "ndk;29.0.14206865"
 
       - name: Create API_KEYS and signing key
         env:
