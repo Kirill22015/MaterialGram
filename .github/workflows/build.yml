@@ -1,0 +1,77 @@
+name: Build APK
+
+# Запускается вручную: вкладка Actions -> Build APK -> Run workflow
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager "ndk;29.0.14206865"
+
+      - name: Create API_KEYS and signing key
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_HASH: ${{ secrets.APP_HASH }}
+        run: |
+          if [ -z "$APP_ID" ] || [ -z "$APP_HASH" ]; then
+            echo "::error::Add repository secrets APP_ID and APP_HASH (Settings -> Secrets and variables -> Actions)"
+            exit 1
+          fi
+          {
+            echo "APP_ID = $APP_ID"
+            echo "APP_HASH = \"$APP_HASH\""
+            echo "MAPS_V2_API = none"
+            echo "SIGNING_KEY_PASSWORD = android123"
+            echo "SIGNING_KEY_ALIAS = key0"
+            echo "SIGNING_KEY_STORE_PASSWORD = android123"
+          } > API_KEYS
+          mkdir -p TMessagesProj/config
+          keytool -genkeypair -keystore TMessagesProj/config/exteraGram.jks \
+            -alias key0 -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android123 -keypass android123 -dname "CN=MaterialGram"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build lite arm64 debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :TMessagesProj:assembleLiteArm64Debug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaterialGram-apk
+          path: TMessagesProj/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
