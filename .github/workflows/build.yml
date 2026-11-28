@@ -21,6 +21,11 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Fix submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive --depth=1
+          
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
